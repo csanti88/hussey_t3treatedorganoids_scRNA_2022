@@ -10,7 +10,7 @@ library(SingleCellExperiment)
 set.seed(1234)
 
 #Load 10x data
-files <- list.dirs("D:/R_files/Human organoid/Raw/", recursive = FALSE)
+files <- list.dirs("./Human organoid/Raw/", recursive = FALSE)
 for (i in files){
   name <- basename(i)
   data <- Read10X(data.dir = i)
