@@ -1,0 +1,57 @@
+# "T3 treated organoids - Cones"
+# '2022-08-30'
+#Load required packages
+library(Seurat)
+library(tidyverse)
+library(viridis)
+library(RColorBrewer)
+library(monocle3)
+library(harmony)
+library(SeuratWrappers)
+library(scDblFinder)
+library(SingleCellExperiment)
+library(UCell)
+set.seed(1234)
+
+#Load data
+hg <- readRDS("F:/Human organoid/R objects/hgorg_allfilter_final.rds")
+
+#Subset photoreceptors
+photo <- subset(hg, idents= c("PR Precursors","Rod","Cone"))
+pr_cell <- CellSelector(DimPlot(photo)) # Use CellSelector to select cells in PR cluster
+photo <- subset(hg, cells = pr_cell)
+
+#Subset cones and PR precursors
+cones <- subset (hg, idents = c("PR Precursors", "Cone"))
+
+#Remove genes that have rowSum = 0 from count matrix and 
+#perform normalization and dimension reduction
+meta <- cones@meta.data
+counts <- cones@assays$RNA@counts [rowSums(cones@assays$RNA@counts)!=0,]
+cones <- CreateSeuratObject(counts = counts, meta.data = meta)
+cones <- NormalizeData(cones) %>% FindVariableFeatures() %>% ScaleData() %>% RunPCA(verbose = FALSE)
+cones <- RunUMAP(cones, dims = 1:5)
+cones <- FindNeighbors(cones, dims = 1:5)
+cones <- FindClusters(cones, resolution = 0.8)
+DimPlot(cones)
+
+# S and M cone module scoring from genes identified from 
+#Peng, et al. Cell 2019, Lu, et al. Dev Cell 2020 and
+#Zhang et, al. J Biol Che 2019
+scone<-c("OPN1SW","CCDC136","PCP4","GNGT1","SAG","TTR","CADM3","NDNF","PRKAR2B","TBX2","YBX3")
+mcone<-c("PDE6H","OPN1MW3","GUCA1A","VOPP1","SLC25A25","GRK7","PPA1","CA2","SAMD7")
+
+cones <- AddModuleScore_UCell(cones, features = list(scone), name = "scone_score")
+names(cones@meta.data)[names(cones@meta.data) == 'signature_1scone_score'] <- 'scone_score'
+cones <- AddModuleScore_UCell(cones, features = list(mcone), name = "mcone_score")
+names(cones@meta.data)[names(cones@meta.data) == 'signature_1mcone_score'] <- 'mcone_score'
+
+#Name specific clusters
+Idents(cones) <- "seurat_clusters"
+old<-c("0","1","2","3","4","5","6","7","8","9","10",
+       "11","12","13")
+new<-c("M Cone","S Cone","M Cone","S Cone","PR Precursors",
+                "PR Precursors","M Cone","M Cone","M Cone","M Cone",
+                "M Cone","M Cone","M Cone","S Cone")
+cones@meta.data$Celltype2 <- plyr::mapvalues(x = cones@meta.data$seurat_clusters, from = old, to = new)
+Idents (cones) <- "Celltype2"
